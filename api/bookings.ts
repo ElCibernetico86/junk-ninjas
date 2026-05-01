@@ -290,6 +290,7 @@ export default async function handler(request: any, response: any) {
         add_ons: payload.addOns,
         subtotal: payload.subtotal,
         total: payload.total,
+        payment_status: 'unpaid',
         photo_path: photoPath,
       })
       .select('id')

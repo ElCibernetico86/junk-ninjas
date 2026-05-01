@@ -11,6 +11,14 @@ const allowedStatuses = new Set([
   'cancelled',
 ]);
 
+const allowedPaymentStatuses = new Set([
+  'unpaid',
+  'pending',
+  'paid',
+  'refunded',
+  'failed',
+]);
+
 const addPhotoUrls = async (bookings: any[]) => {
   if (!supabaseAdmin) {
     return bookings;
@@ -44,7 +52,7 @@ export default async function handler(request: any, response: any) {
   if (request.method === 'GET') {
     const { data, error } = await supabaseAdmin
       .from('bookings')
-      .select('id, created_at, status, customer_name, phone, address, zip, pickup_date, pickup_window, items, add_ons, subtotal, total, photo_path, notes')
+      .select('id, created_at, status, payment_status, customer_name, phone, address, zip, pickup_date, pickup_window, items, add_ons, subtotal, total, photo_path, notes')
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -59,6 +67,7 @@ export default async function handler(request: any, response: any) {
   if (request.method === 'PATCH') {
     const id = String(request.body?.id || '');
     const status = String(request.body?.status || '');
+    const paymentStatus = String(request.body?.payment_status || '');
     const notes = request.body?.notes;
 
     if (!id) {
@@ -69,9 +78,16 @@ export default async function handler(request: any, response: any) {
       return response.status(400).json({ error: 'Invalid booking status.' });
     }
 
+    if (paymentStatus && !allowedPaymentStatuses.has(paymentStatus)) {
+      return response.status(400).json({ error: 'Invalid payment status.' });
+    }
+
     const updates: Record<string, unknown> = {};
     if (status) {
       updates.status = status;
+    }
+    if (paymentStatus) {
+      updates.payment_status = paymentStatus;
     }
     if (typeof notes === 'string') {
       updates.notes = notes;
@@ -81,7 +97,7 @@ export default async function handler(request: any, response: any) {
       .from('bookings')
       .update(updates)
       .eq('id', id)
-      .select('id, created_at, status, customer_name, phone, address, zip, pickup_date, pickup_window, items, add_ons, subtotal, total, photo_path, notes')
+      .select('id, created_at, status, payment_status, customer_name, phone, address, zip, pickup_date, pickup_window, items, add_ons, subtotal, total, photo_path, notes')
       .single();
 
     if (error) {

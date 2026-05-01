@@ -320,6 +320,7 @@ type AdminBooking = {
   id: string;
   created_at: string;
   status: string;
+  payment_status?: string;
   customer_name: string;
   phone: string;
   address: string;
@@ -335,6 +336,7 @@ type AdminBooking = {
 };
 
 const adminStatuses = ['new', 'confirmed', 'scheduled', 'completed', 'cancelled'];
+const adminPaymentStatuses = ['unpaid', 'pending', 'paid', 'refunded', 'failed'];
 
 const adminFormatMoney = (amount: number) => `$${Number(amount || 0).toLocaleString('en-US')}`;
 
@@ -447,7 +449,7 @@ const AdminDashboard = () => {
     setBookings([]);
   };
 
-  const updateBooking = async (id: string, updates: { status?: string; notes?: string }) => {
+  const updateBooking = async (id: string, updates: { status?: string; payment_status?: string; notes?: string }) => {
     const previousBookings = bookings;
     setBookings(current => current.map(booking => booking.id === id ? { ...booking, ...updates } : booking));
 
@@ -586,7 +588,12 @@ const AdminDashboard = () => {
                   <span className="border border-zinc-700 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-orange-500">{booking.status}</span>
                 </div>
                 <p className="mt-3 text-sm text-zinc-400">{booking.address} {booking.zip}</p>
-                <p className="mt-3 text-lg font-black text-orange-500">{adminFormatMoney(booking.total)}</p>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p className="text-lg font-black text-orange-500">{adminFormatMoney(booking.total)}</p>
+                  <span className={`border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${booking.payment_status === 'paid' ? 'border-green-500/60 text-green-400' : 'border-zinc-700 text-zinc-500'}`}>
+                    {booking.payment_status || 'unpaid'}
+                  </span>
+                </div>
               </button>
             ))}
           </section>
@@ -600,15 +607,32 @@ const AdminDashboard = () => {
                     <h2 className="mt-1 break-all text-2xl font-black uppercase tracking-tight text-white">{selectedBooking.id}</h2>
                     <p className="mt-2 text-xs font-bold uppercase tracking-widest text-zinc-500">Created {adminFormatDateTime(selectedBooking.created_at)}</p>
                   </div>
-                  <select
-                    value={selectedBooking.status}
-                    onChange={event => updateBooking(selectedBooking.id, { status: event.target.value })}
-                    className="border border-zinc-700 bg-black px-3 py-3 text-sm font-black uppercase tracking-widest text-white outline-none focus:border-orange-500"
-                  >
-                    {adminStatuses.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Job Status</label>
+                      <select
+                        value={selectedBooking.status}
+                        onChange={event => updateBooking(selectedBooking.id, { status: event.target.value })}
+                        className="w-full border border-zinc-700 bg-black px-3 py-3 text-sm font-black uppercase tracking-widest text-white outline-none focus:border-orange-500"
+                      >
+                        {adminStatuses.map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Payment</label>
+                      <select
+                        value={selectedBooking.payment_status || 'unpaid'}
+                        onChange={event => updateBooking(selectedBooking.id, { payment_status: event.target.value })}
+                        className="w-full border border-zinc-700 bg-black px-3 py-3 text-sm font-black uppercase tracking-widest text-white outline-none focus:border-orange-500"
+                      >
+                        {adminPaymentStatuses.map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid gap-6 py-6 md:grid-cols-2">
@@ -626,6 +650,7 @@ const AdminDashboard = () => {
                       <p><span className="text-zinc-500">Date:</span> {adminFormatDate(selectedBooking.pickup_date)}</p>
                       <p><span className="text-zinc-500">Window:</span> {selectedBooking.pickup_window}</p>
                       <p><span className="text-zinc-500">Total:</span> {adminFormatMoney(selectedBooking.total)}</p>
+                      <p><span className="text-zinc-500">Payment:</span> {(selectedBooking.payment_status || 'unpaid').toUpperCase()}</p>
                     </div>
                   </div>
                 </div>
