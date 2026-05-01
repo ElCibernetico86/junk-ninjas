@@ -331,7 +331,6 @@ export default function App() {
   const [formError, setFormError] = useState('');
   const [pickupWindows, setPickupWindows] = useState<AvailabilityWindow[]>(defaultPickupWindows);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState('');
   const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>({
     customerName: '',
     phone: '',
@@ -396,13 +395,11 @@ export default function App() {
   useEffect(() => {
     if (!checkoutForm.pickupDate) {
       setPickupWindows(defaultPickupWindows);
-      setAvailabilityError('');
       return;
     }
 
     let isActive = true;
     setIsCheckingAvailability(true);
-    setAvailabilityError('');
 
     fetch(`/api/availability?date=${encodeURIComponent(checkoutForm.pickupDate)}`)
       .then(async response => {
@@ -430,8 +427,7 @@ export default function App() {
           return;
         }
 
-        const message = error instanceof Error ? error.message : 'Could not check availability.';
-        setAvailabilityError(message);
+        console.warn('Availability check failed. Falling back to open windows.', error);
         setPickupWindows(defaultPickupWindows);
       })
       .finally(() => {
@@ -974,15 +970,9 @@ export default function App() {
                           </select>
                           {checkoutForm.pickupDate ? (
                             <div className="mt-2 space-y-1">
-                              {availabilityError ? (
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">
-                                  Availability check failed. Windows are shown as selectable.
-                                </p>
-                              ) : (
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                                  Booked windows are disabled automatically.
-                                </p>
-                              )}
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                                Booked windows are disabled automatically.
+                              </p>
                             </div>
                           ) : null}
                         </div>

@@ -119,7 +119,17 @@ export default async function handler(request: any, response: any) {
       },
     });
 
-    const busyPeriods = data.calendars?.[googleCalendarId]?.busy || [];
+    const calendarStatus = data.calendars?.[googleCalendarId];
+    if (calendarStatus?.errors?.length) {
+      console.error('Google Calendar freebusy returned calendar errors:', calendarStatus.errors);
+    }
+
+    const busyPeriods = calendarStatus?.busy || [];
+    console.log('Availability checked:', {
+      date,
+      busyPeriods: busyPeriods.length,
+      calendarConfigured: true,
+    });
 
     const windows: AvailabilityWindow[] = Object.entries(pickupWindowTimes).map(([id, window]) => {
       const isBusy = busyPeriods.some(busy => windowOverlapsBusyPeriod(date, id, busy));
