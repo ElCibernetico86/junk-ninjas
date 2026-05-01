@@ -316,7 +316,372 @@ const ItemCard: React.FC<{
   );
 };
 
-export default function App() {
+type AdminBooking = {
+  id: string;
+  created_at: string;
+  status: string;
+  customer_name: string;
+  phone: string;
+  address: string;
+  zip: string;
+  pickup_date: string;
+  pickup_window: string;
+  items: Array<Record<string, unknown>>;
+  add_ons: Array<Record<string, unknown>>;
+  subtotal: number;
+  total: number;
+  photo_url?: string | null;
+  notes?: string | null;
+};
+
+const adminStatuses = ['new', 'confirmed', 'scheduled', 'completed', 'cancelled'];
+
+const adminFormatMoney = (amount: number) => `$${Number(amount || 0).toLocaleString('en-US')}`;
+
+const adminFormatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const adminFormatDateTime = (value: string) => new Date(value).toLocaleString('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+const adminLineName = (line: Record<string, unknown>) => {
+  const name = String(line.name || line.id || 'Item');
+  const quantity = line.quantity ? ` x${line.quantity}` : '';
+  return `${name}${quantity}`;
+};
+
+const AdminDashboard = () => {
+  const [password, setPassword] = useState('');
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [adminError, setAdminError] = useState('');
+
+  const selectedBooking = bookings.find(booking => booking.id === selectedId) || bookings[0];
+  const filteredBookings = bookings.filter(booking => statusFilter === 'all' || booking.status === statusFilter);
+  const openBookings = bookings.filter(booking => !['completed', 'cancelled'].includes(booking.status)).length;
+  const todaysBookings = bookings.filter(booking => booking.pickup_date === today).length;
+
+  const fetchBookings = async () => {
+    setIsLoading(true);
+    setAdminError('');
+
+    try {
+      const response = await fetch('/api/admin/bookings', { credentials: 'include' });
+      const result = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        setAuthRequired(true);
+        setBookings([]);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not load bookings.');
+      }
+
+      const loadedBookings = Array.isArray(result.bookings) ? result.bookings : [];
+      setBookings(loadedBookings);
+      setAuthRequired(false);
+      setSelectedId(current => current || loadedBookings[0]?.id || '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not load bookings.';
+      setAdminError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (window.location.pathname.startsWith('/admin')) {
+      fetchBookings();
+    }
+  }, []);
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    setIsLoggingIn(true);
+    setAdminError('');
+
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ password }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not log in.');
+      }
+
+      setPassword('');
+      await fetchBookings();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not log in.';
+      setAdminError(message);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    setAuthRequired(true);
+    setBookings([]);
+  };
+
+  const updateBooking = async (id: string, updates: { status?: string; notes?: string }) => {
+    const previousBookings = bookings;
+    setBookings(current => current.map(booking => booking.id === id ? { ...booking, ...updates } : booking));
+
+    try {
+      const response = await fetch('/api/admin/bookings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ id, ...updates }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not update booking.');
+      }
+
+      setBookings(current => current.map(booking => booking.id === id ? result.booking : booking));
+    } catch (error) {
+      setBookings(previousBookings);
+      const message = error instanceof Error ? error.message : 'Could not update booking.';
+      setAdminError(message);
+    }
+  };
+
+  if (authRequired) {
+    return (
+      <div className="min-h-screen bg-zinc-950 px-4 py-12 text-white">
+        <div className="mx-auto max-w-md border border-zinc-800 bg-zinc-900 p-8">
+          <div className="mb-8 flex items-center gap-3">
+            <NinjaIcon className="h-10 w-10 text-orange-500" />
+            <div>
+              <h1 className="text-2xl font-black uppercase tracking-tight">Admin Login</h1>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Junk Ninjas Dashboard</p>
+            </div>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Password</label>
+              <input
+                required
+                type="password"
+                value={password}
+                onChange={event => setPassword(event.target.value)}
+                className="w-full border border-zinc-700 bg-black px-4 py-3 text-white outline-none focus:border-orange-500"
+              />
+            </div>
+            {adminError ? (
+              <div className="border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">{adminError}</div>
+            ) : null}
+            <button type="submit" disabled={isLoggingIn} className="w-full bg-orange-500 px-6 py-4 font-black uppercase tracking-widest text-black disabled:opacity-60">
+              {isLoggingIn ? 'Logging In...' : 'Open Dashboard'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <header className="border-b border-zinc-800 bg-black px-4 py-4">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <NinjaIcon className="h-9 w-9 text-orange-500" />
+            <div>
+              <h1 className="text-2xl font-black uppercase tracking-tight">Booking Admin</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Junk Ninjas Operations</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={fetchBookings} className="border border-zinc-700 px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-300 hover:border-orange-500">
+              Refresh
+            </button>
+            <button type="button" onClick={handleLogout} className="bg-orange-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-black">
+              Log Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          <div className="border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Open Jobs</p>
+            <p className="mt-2 text-4xl font-black text-orange-500">{openBookings}</p>
+          </div>
+          <div className="border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Today</p>
+            <p className="mt-2 text-4xl font-black text-orange-500">{todaysBookings}</p>
+          </div>
+          <div className="border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Last 100 Bookings</p>
+            <p className="mt-2 text-4xl font-black text-orange-500">{bookings.length}</p>
+          </div>
+        </div>
+
+        {adminError ? (
+          <div className="mb-6 border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">{adminError}</div>
+        ) : null}
+
+        <div className="mb-6 flex flex-wrap gap-2">
+          {['all', ...adminStatuses].map(status => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`border px-3 py-2 text-[10px] font-black uppercase tracking-widest ${statusFilter === status ? 'border-orange-500 bg-orange-500 text-black' : 'border-zinc-800 text-zinc-400 hover:border-orange-500'}`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+          <section className="space-y-3">
+            {isLoading ? (
+              <div className="border border-zinc-800 bg-zinc-900 p-6 text-sm font-bold text-zinc-500">Loading bookings...</div>
+            ) : null}
+            {!isLoading && !filteredBookings.length ? (
+              <div className="border border-zinc-800 bg-zinc-900 p-6 text-sm font-bold text-zinc-500">No bookings found.</div>
+            ) : null}
+            {filteredBookings.map(booking => (
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => setSelectedId(booking.id)}
+                className={`block w-full border p-4 text-left transition-colors ${selectedBooking?.id === booking.id ? 'border-orange-500 bg-orange-500/10' : 'border-zinc-800 bg-zinc-900 hover:border-orange-500'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black uppercase tracking-tight text-white">{booking.customer_name}</p>
+                    <p className="mt-1 text-xs font-bold text-zinc-500">{adminFormatDate(booking.pickup_date)} / {booking.pickup_window}</p>
+                  </div>
+                  <span className="border border-zinc-700 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-orange-500">{booking.status}</span>
+                </div>
+                <p className="mt-3 text-sm text-zinc-400">{booking.address} {booking.zip}</p>
+                <p className="mt-3 text-lg font-black text-orange-500">{adminFormatMoney(booking.total)}</p>
+              </button>
+            ))}
+          </section>
+
+          <section className="min-h-96 border border-zinc-800 bg-zinc-900 p-6">
+            {selectedBooking ? (
+              <div>
+                <div className="flex flex-col gap-4 border-b border-zinc-800 pb-6 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Booking ID</p>
+                    <h2 className="mt-1 break-all text-2xl font-black uppercase tracking-tight text-white">{selectedBooking.id}</h2>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-widest text-zinc-500">Created {adminFormatDateTime(selectedBooking.created_at)}</p>
+                  </div>
+                  <select
+                    value={selectedBooking.status}
+                    onChange={event => updateBooking(selectedBooking.id, { status: event.target.value })}
+                    className="border border-zinc-700 bg-black px-3 py-3 text-sm font-black uppercase tracking-widest text-white outline-none focus:border-orange-500"
+                  >
+                    {adminStatuses.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-6 py-6 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Customer</h3>
+                    <div className="mt-3 space-y-2 text-sm text-zinc-300">
+                      <p><span className="text-zinc-500">Name:</span> {selectedBooking.customer_name}</p>
+                      <p><span className="text-zinc-500">Phone:</span> <a className="text-orange-400" href={`tel:${selectedBooking.phone}`}>{selectedBooking.phone}</a></p>
+                      <p><span className="text-zinc-500">Address:</span> {selectedBooking.address} {selectedBooking.zip}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Pickup</h3>
+                    <div className="mt-3 space-y-2 text-sm text-zinc-300">
+                      <p><span className="text-zinc-500">Date:</span> {adminFormatDate(selectedBooking.pickup_date)}</p>
+                      <p><span className="text-zinc-500">Window:</span> {selectedBooking.pickup_window}</p>
+                      <p><span className="text-zinc-500">Total:</span> {adminFormatMoney(selectedBooking.total)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="border border-zinc-800 bg-black p-4">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Items</h3>
+                    <div className="mt-3 space-y-2 text-sm text-zinc-300">
+                      {selectedBooking.items?.map((item, index) => (
+                        <p key={`${selectedBooking.id}-item-${index}`}>{adminLineName(item)}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border border-zinc-800 bg-black p-4">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Add-ons</h3>
+                    <div className="mt-3 space-y-2 text-sm text-zinc-300">
+                      {selectedBooking.add_ons?.length ? selectedBooking.add_ons.map((item, index) => (
+                        <p key={`${selectedBooking.id}-addon-${index}`}>{adminLineName(item)}</p>
+                      )) : <p className="text-zinc-500">None</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Admin Notes</label>
+                  <textarea
+                    value={selectedBooking.notes || ''}
+                    onChange={event => setBookings(current => current.map(booking => booking.id === selectedBooking.id ? { ...booking, notes: event.target.value } : booking))}
+                    onBlur={event => updateBooking(selectedBooking.id, { notes: event.target.value })}
+                    className="min-h-28 w-full border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none focus:border-orange-500"
+                    placeholder="Crew notes, access details, customer requests..."
+                  />
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {selectedBooking.photo_url ? (
+                    <a href={selectedBooking.photo_url} target="_blank" rel="noreferrer" className="border border-orange-500 px-4 py-3 text-xs font-black uppercase tracking-widest text-orange-500 hover:bg-orange-500 hover:text-black">
+                      View Photo
+                    </a>
+                  ) : null}
+                  <a href={`sms:${selectedBooking.phone}`} className="border border-zinc-700 px-4 py-3 text-xs font-black uppercase tracking-widest text-zinc-300 hover:border-orange-500">
+                    Text Customer
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm font-bold text-zinc-500">Select a booking to view details.</div>
+            )}
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+function BookingApp() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [rush, setRush] = useState(false);
   const [heavy, setHeavy] = useState(false);
@@ -1049,4 +1414,12 @@ export default function App() {
       </footer>
     </div>
   );
+}
+
+export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    return <AdminDashboard />;
+  }
+
+  return <BookingApp />;
 }
