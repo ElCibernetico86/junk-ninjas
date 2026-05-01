@@ -18,37 +18,66 @@ const timeToMinutes = (time: string) => {
   return (hours * 60) + minutes;
 };
 
-const dateTimeToMinutes = (dateTime: string) => timeToMinutes(dateTime.slice(11, 16));
-
 const minutesToDate = (minutes: number) => {
   const date = new Date(0);
   date.setUTCHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
   return date;
 };
 
-const windowOverlapsEvent = (
+const addDays = (date: string, days: number) => {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+};
+
+const getZonedDateMinutes = (dateTime: string) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: googleCalendarTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(dateTime));
+
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    minutes: (Number(values.hour) * 60) + Number(values.minute),
+  };
+};
+
+const windowOverlapsBusyPeriod = (
   date: string,
   windowId: string,
-  event: { start?: string | null; end?: string | null; startDate?: string | null; endDate?: string | null },
+  busy: { start?: string | null; end?: string | null },
 ) => {
   const window = pickupWindowTimes[windowId];
   if (!window) {
     return false;
   }
 
-  if (event.startDate || event.endDate) {
-    return event.startDate === date;
-  }
-
-  if (!event.start || !event.end || !event.start.startsWith(date)) {
+  if (!busy.start || !busy.end) {
     return false;
   }
+
+  const busyStart = getZonedDateMinutes(busy.start);
+  const busyEnd = getZonedDateMinutes(busy.end);
+
+  if (busyStart.date > date || busyEnd.date < date) {
+    return false;
+  }
+
+  const busyStartMinutes = busyStart.date < date ? 0 : busyStart.minutes;
+  const busyEndMinutes = busyEnd.date > date ? 1440 : busyEnd.minutes;
 
   return rangesOverlap(
     minutesToDate(timeToMinutes(window.start)),
     minutesToDate(timeToMinutes(window.end)),
-    minutesToDate(dateTimeToMinutes(event.start)),
-    minutesToDate(dateTimeToMinutes(event.end)),
+    minutesToDate(busyStartMinutes),
+    minutesToDate(busyEndMinutes),
   );
 };
 
@@ -78,30 +107,22 @@ export default async function handler(request: any, response: any) {
 
   try {
     const calendar = getCalendarClient();
-    const dayStart = `${date}T00:00:00-06:00`;
-    const dayEnd = `${date}T23:59:59-06:00`;
+    const dayStart = `${date}T00:00:00Z`;
+    const dayEnd = `${addDays(date, 1)}T23:59:59Z`;
 
-    const { data } = await calendar.events.list({
-      calendarId: googleCalendarId,
-      timeMin: dayStart,
-      timeMax: dayEnd,
-      timeZone: googleCalendarTimeZone,
-      singleEvents: true,
-      orderBy: 'startTime',
-      showDeleted: false,
+    const { data } = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: dayStart,
+        timeMax: dayEnd,
+        timeZone: googleCalendarTimeZone,
+        items: [{ id: googleCalendarId }],
+      },
     });
 
-    const busyEvents = (data.items || [])
-      .map(event => ({
-        start: event.start?.dateTime || null,
-        end: event.end?.dateTime || null,
-        startDate: event.start?.date || null,
-        endDate: event.end?.date || null,
-      }))
-      .filter(event => Boolean((event.start && event.end) || event.startDate));
+    const busyPeriods = data.calendars?.[googleCalendarId]?.busy || [];
 
     const windows: AvailabilityWindow[] = Object.entries(pickupWindowTimes).map(([id, window]) => {
-      const isBusy = busyEvents.some(event => windowOverlapsEvent(date, id, event));
+      const isBusy = busyPeriods.some(busy => windowOverlapsBusyPeriod(date, id, busy));
 
       return {
         id,
@@ -117,6 +138,16 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown availability error';
     console.error('Availability check failed:', error);
-    return response.status(500).json({ error: message });
+    const windows: AvailabilityWindow[] = Object.entries(pickupWindowTimes).map(([id, window]) => ({
+      id,
+      label: window.label,
+      available: true,
+    }));
+
+    return response.status(200).json({
+      configured: true,
+      error: message,
+      windows,
+    });
   }
 }
