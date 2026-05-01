@@ -6,7 +6,7 @@ import {
   googleCalendarId,
   googleCalendarTimeZone,
   isGoogleCalendarConfigured,
-} from './_calendar';
+} from './_calendar.js';
 
 type BookingPhoto = {
   name: string;

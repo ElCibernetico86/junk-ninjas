@@ -5,7 +5,7 @@ import {
   isGoogleCalendarConfigured,
   pickupWindowTimes,
   rangesOverlap,
-} from './_calendar';
+} from './_calendar.js';
 
 type AvailabilityWindow = {
   id: string;
