@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import Stripe from 'stripe';
 import {
   getCalendarClient,
   getWindowDateTimes,
@@ -45,6 +46,8 @@ const photoBucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || 'booking-photo
 const notificationTo = process.env.BOOKING_NOTIFICATION_EMAIL;
 const notificationFrom = process.env.BOOKING_NOTIFICATION_FROM || 'Junk Ninjas <onboarding@resend.dev>';
 const resendApiKey = process.env.RESEND_API_KEY;
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeCurrency = process.env.STRIPE_CURRENCY || 'usd';
 
 const supabase = supabaseUrl && supabaseSecretKey
   ? createClient(supabaseUrl, supabaseSecretKey, {
@@ -55,6 +58,7 @@ const supabase = supabaseUrl && supabaseSecretKey
   : null;
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const requiredFields: Array<keyof BookingPayload> = [
   'customerName',
@@ -228,6 +232,72 @@ const createCalendarEvent = async (
   return { created: true, eventId: data.id || undefined };
 };
 
+const getBaseUrl = (request: any) => {
+  if (process.env.SITE_URL) {
+    return process.env.SITE_URL.replace(/\/$/, '');
+  }
+
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/$/, '');
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  const origin = request.headers.origin || request.headers.referer;
+  return String(origin || '').replace(/\/$/, '');
+};
+
+const createCheckoutSession = async (
+  request: any,
+  bookingId: string,
+  payload: BookingPayload,
+) => {
+  if (!stripe) {
+    return null;
+  }
+
+  const baseUrl = getBaseUrl(request);
+
+  if (!baseUrl) {
+    throw new Error('SITE_URL is required to create Stripe Checkout sessions.');
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    submit_type: 'pay',
+    phone_number_collection: {
+      enabled: true,
+    },
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: stripeCurrency,
+          unit_amount: Math.round(payload.total * 100),
+          product_data: {
+            name: 'Junk Ninjas Pickup',
+            description: `${payload.pickupDate} / ${payload.pickupWindow}`,
+          },
+        },
+      },
+    ],
+    metadata: {
+      bookingId,
+      customerName: payload.customerName,
+      phone: payload.phone,
+    },
+    success_url: `${baseUrl}/?payment=success&booking_id=${bookingId}`,
+    cancel_url: `${baseUrl}/?payment=cancelled&booking_id=${bookingId}`,
+  });
+
+  return {
+    id: session.id,
+    url: session.url,
+  };
+};
+
 export default async function handler(request: any, response: any) {
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
@@ -290,7 +360,7 @@ export default async function handler(request: any, response: any) {
         add_ons: payload.addOns,
         subtotal: payload.subtotal,
         total: payload.total,
-        payment_status: 'unpaid',
+        payment_status: stripe ? 'pending' : 'unpaid',
         photo_path: photoPath,
       })
       .select('id')
@@ -329,7 +399,9 @@ export default async function handler(request: any, response: any) {
       notification = { sent: false, reason: 'Email notification failed.' };
     }
 
-    return response.status(200).json({ bookingId: data.id, notification, calendar });
+    const checkout = await createCheckoutSession(request, data.id, payload);
+
+    return response.status(200).json({ bookingId: data.id, notification, calendar, checkout });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown booking error';
     return response.status(500).json({ error: message });

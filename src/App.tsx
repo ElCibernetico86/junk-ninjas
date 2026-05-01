@@ -707,6 +707,7 @@ const AdminDashboard = () => {
 };
 
 function BookingApp() {
+  const paymentResult = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('payment') : null;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [rush, setRush] = useState(false);
   const [heavy, setHeavy] = useState(false);
@@ -890,7 +891,7 @@ function BookingApp() {
       });
 
       const responseText = await response.text();
-      let result: { error?: string; bookingId?: string } = {};
+      let result: { error?: string; bookingId?: string; checkout?: { url?: string | null } | null } = {};
 
       try {
         result = responseText ? JSON.parse(responseText) : {};
@@ -900,6 +901,11 @@ function BookingApp() {
 
       if (!response.ok) {
         throw new Error(result.error || `Could not save this booking. Status: ${response.status}`);
+      }
+
+      if (result.checkout?.url) {
+        window.location.href = result.checkout.url;
+        return;
       }
 
       setSubmittedBookingId(result.bookingId || '');
@@ -926,6 +932,14 @@ function BookingApp() {
           </div>
         </div>
       </nav>
+
+      {paymentResult ? (
+        <div className={`fixed left-4 right-4 top-16 z-40 mx-auto max-w-3xl border px-4 py-3 text-sm font-bold shadow-2xl ${paymentResult === 'success' ? 'border-green-500/50 bg-green-500/15 text-green-200' : 'border-orange-500/50 bg-orange-500/15 text-orange-200'}`}>
+          {paymentResult === 'success'
+            ? 'Payment received. Your pickup request is saved and we will follow up by text.'
+            : 'Payment was not completed. Your request may still be saved, but the payment status will remain pending.'}
+        </div>
+      ) : null}
 
       <header className="relative pt-28 pb-16 lg:pt-36 lg:pb-20 border-b border-zinc-800 px-4 bg-zinc-900 overflow-hidden">
         <img
