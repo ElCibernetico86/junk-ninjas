@@ -499,10 +499,17 @@ export default function App() {
         }),
       });
 
-      const result = await response.json().catch(() => ({}));
+      const responseText = await response.text();
+      let result: { error?: string; bookingId?: string } = {};
+
+      try {
+        result = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        result = { error: responseText };
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Could not save this booking.');
+        throw new Error(result.error || `Could not save this booking. Status: ${response.status}`);
       }
 
       setSubmittedBookingId(result.bookingId || '');

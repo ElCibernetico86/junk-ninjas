@@ -184,7 +184,7 @@ const createCalendarEvent = async (
   }
 
   const windowDateTimes = getWindowDateTimes(payload.pickupDate, payload.pickupWindow);
-  const calendar = getCalendarClient();
+  const calendar = getCalendarClient(['https://www.googleapis.com/auth/calendar.events']);
   const description = [
     `Booking ID: ${bookingId}`,
     `Customer: ${payload.customerName}`,
@@ -240,6 +240,12 @@ export default async function handler(request: any, response: any) {
 
   try {
     const payload = request.body as BookingPayload;
+    console.log('Booking request received:', {
+      pickupDate: payload?.pickupDate,
+      pickupWindow: payload?.pickupWindow,
+      itemCount: Array.isArray(payload?.items) ? payload.items.length : 0,
+      hasPhoto: Boolean(payload?.photo?.data),
+    });
 
     const missingField = requiredFields.find(field => payload[field] === undefined || payload[field] === null || payload[field] === '');
     if (missingField) {
@@ -290,6 +296,7 @@ export default async function handler(request: any, response: any) {
       .single();
 
     if (error) {
+      console.error('Supabase booking insert failed:', error);
       return response.status(500).json({ error: `Booking save failed: ${error.message}` });
     }
 

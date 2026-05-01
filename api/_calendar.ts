@@ -15,7 +15,7 @@ export const isGoogleCalendarConfigured = () => (
   Boolean(googleCalendarId && googleServiceAccountEmail && googlePrivateKey)
 );
 
-export const getCalendarClient = () => {
+export const getCalendarClient = (scopes = ['https://www.googleapis.com/auth/calendar']) => {
   if (!googleServiceAccountEmail || !googlePrivateKey) {
     throw new Error('Google Calendar credentials are not configured.');
   }
@@ -23,7 +23,7 @@ export const getCalendarClient = () => {
   const auth = new google.auth.JWT({
     email: googleServiceAccountEmail,
     key: googlePrivateKey,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
+    scopes,
   });
 
   return google.calendar({ version: 'v3', auth });
