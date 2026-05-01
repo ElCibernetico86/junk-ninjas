@@ -74,7 +74,6 @@ const defaultPickupWindows: AvailabilityWindow[] = [
 ];
 
 const QUICK_ITEMS: Item[] = [
-  { id: 'live_payment_test', name: 'Live Payment Test', price: 1, description: 'Temporary $1 item for live payment verification.', kind: 'tv' },
   { id: 'couch', name: 'Standard Couch', price: 95, description: 'Sofa, loveseat, or sectional piece.', kind: 'couch' },
   { id: 'mattress', name: 'Mattress & Box Spring', price: 95, description: 'Any standard mattress size, curbside ready.', kind: 'mattress' },
   { id: 'fridge', name: 'Refrigerator', price: 110, description: 'Garage or kitchen unit with clear access.', kind: 'fridge' },
