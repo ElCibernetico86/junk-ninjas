@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { google } from 'googleapis';
 import { Resend } from 'resend';
 
 type BookingPhoto = {
@@ -26,12 +27,22 @@ type NotificationResult = {
   reason?: string;
 };
 
+type CalendarResult = {
+  created: boolean;
+  eventId?: string;
+  reason?: string;
+};
+
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const photoBucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || 'booking-photos';
 const notificationTo = process.env.BOOKING_NOTIFICATION_EMAIL;
 const notificationFrom = process.env.BOOKING_NOTIFICATION_FROM || 'Junk Ninjas <onboarding@resend.dev>';
 const resendApiKey = process.env.RESEND_API_KEY;
+const googleCalendarId = process.env.GOOGLE_CALENDAR_ID;
+const googleServiceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const googlePrivateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const googleCalendarTimeZone = process.env.GOOGLE_CALENDAR_TIME_ZONE || 'America/Chicago';
 
 const supabase = supabaseUrl && supabaseSecretKey
   ? createClient(supabaseUrl, supabaseSecretKey, {
@@ -70,6 +81,24 @@ const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/'/g, '&#039;');
 
 const formatMoney = (amount: number) => `$${Number(amount || 0).toLocaleString('en-US')}`;
+
+const textList = (items: unknown[]) => {
+  if (!items.length) {
+    return 'None';
+  }
+
+  return items.map(item => {
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      const name = record.name || record.id || 'Item';
+      const quantity = record.quantity ? ` x${record.quantity}` : '';
+      const price = typeof record.price === 'number' ? ` - ${formatMoney(record.price)}` : '';
+      return `- ${name}${quantity}${price}`;
+    }
+
+    return `- ${item}`;
+  }).join('\n');
+};
 
 const renderList = (items: unknown[]) => {
   if (!items.length) {
@@ -141,6 +170,76 @@ const sendBookingNotification = async (
 
   console.log('Booking notification email sent:', data?.id);
   return { sent: true };
+};
+
+const pickupWindowTimes: Record<string, { start: string; end: string }> = {
+  '8am-12pm': { start: '08:00:00', end: '12:00:00' },
+  '12pm-4pm': { start: '12:00:00', end: '16:00:00' },
+  '4pm-8pm': { start: '16:00:00', end: '20:00:00' },
+};
+
+const createCalendarEvent = async (
+  bookingId: string,
+  payload: BookingPayload,
+  photoUrl: string | null,
+): Promise<CalendarResult> => {
+  if (!googleCalendarId || !googleServiceAccountEmail || !googlePrivateKey) {
+    return { created: false, reason: 'Google Calendar is not configured.' };
+  }
+
+  const windowTimes = pickupWindowTimes[payload.pickupWindow];
+  if (!windowTimes) {
+    return { created: false, reason: 'Unknown pickup window.' };
+  }
+
+  const auth = new google.auth.JWT({
+    email: googleServiceAccountEmail,
+    key: googlePrivateKey,
+    scopes: ['https://www.googleapis.com/auth/calendar.events'],
+  });
+
+  const calendar = google.calendar({ version: 'v3', auth });
+  const description = [
+    `Booking ID: ${bookingId}`,
+    `Customer: ${payload.customerName}`,
+    `Phone: ${payload.phone}`,
+    `Address: ${payload.address} ${payload.zip}`,
+    '',
+    'Items:',
+    textList(payload.items),
+    '',
+    'Add-ons:',
+    textList(payload.addOns),
+    '',
+    `Subtotal: ${formatMoney(payload.subtotal)}`,
+    `Total: ${formatMoney(payload.total)}`,
+    photoUrl ? `Photo: ${photoUrl}` : '',
+  ].filter(Boolean).join('\n');
+
+  const { data } = await calendar.events.insert({
+    calendarId: googleCalendarId,
+    requestBody: {
+      summary: `Junk Ninjas Pickup - ${payload.customerName}`,
+      location: `${payload.address} ${payload.zip}`,
+      description,
+      start: {
+        dateTime: `${payload.pickupDate}T${windowTimes.start}`,
+        timeZone: googleCalendarTimeZone,
+      },
+      end: {
+        dateTime: `${payload.pickupDate}T${windowTimes.end}`,
+        timeZone: googleCalendarTimeZone,
+      },
+      extendedProperties: {
+        private: {
+          bookingId,
+        },
+      },
+    },
+  });
+
+  console.log('Google Calendar event created:', data.id);
+  return { created: true, eventId: data.id || undefined };
 };
 
 export default async function handler(request: any, response: any) {
@@ -218,6 +317,15 @@ export default async function handler(request: any, response: any) {
       photoUrl = signedUrlData?.signedUrl || null;
     }
 
+    let calendar: CalendarResult = { created: false, reason: 'Google Calendar is not configured.' };
+
+    try {
+      calendar = await createCalendarEvent(data.id, payload, photoUrl);
+    } catch (calendarError) {
+      console.error('Google Calendar event creation failed:', calendarError);
+      calendar = { created: false, reason: 'Google Calendar event creation failed.' };
+    }
+
     let notification: NotificationResult = { sent: false, reason: 'Email notifications are not configured.' };
 
     try {
@@ -227,7 +335,7 @@ export default async function handler(request: any, response: any) {
       notification = { sent: false, reason: 'Email notification failed.' };
     }
 
-    return response.status(200).json({ bookingId: data.id, notification });
+    return response.status(200).json({ bookingId: data.id, notification, calendar });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown booking error';
     return response.status(500).json({ error: message });
