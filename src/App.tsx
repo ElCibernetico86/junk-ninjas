@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState, FormEvent } from 'react';
+import React, { useId, useMemo, useState, ChangeEvent, FormEvent } from 'react';
 import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2, ShieldCheck } from 'lucide-react';
 
 const NinjaIcon = ({ className = "" }: { className?: string }) => (
@@ -46,6 +46,20 @@ type Item = {
 };
 
 type ServiceStatus = 'idle' | 'in' | 'out';
+
+type BookingPhotoPayload = {
+  name: string;
+  type: string;
+  data: string;
+};
+
+type CheckoutForm = {
+  customerName: string;
+  phone: string;
+  address: string;
+  pickupDate: string;
+  pickupWindow: string;
+};
 
 const QUICK_ITEMS: Item[] = [
   { id: 'couch', name: 'Standard Couch', price: 95, description: 'Sofa, loveseat, or sectional piece.', kind: 'couch' },
@@ -109,6 +123,25 @@ const SERVICE_ZIPS = new Set([
 ]);
 
 const today = new Date().toISOString().slice(0, 10);
+
+const fileToBookingPhoto = (file: File): Promise<BookingPhotoPayload> => (
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve({
+        name: file.name,
+        type: file.type,
+        data: base64,
+      });
+    };
+    reader.onerror = () => reject(new Error('Could not read the selected photo.'));
+    reader.readAsDataURL(file);
+  })
+);
+
+const maxBookingPhotoSize = 4 * 1024 * 1024;
 
 const ItemVisual = ({ kind }: { kind: ItemKind }) => {
   if (kind === 'pile') {
@@ -279,7 +312,18 @@ export default function App() {
   const [serviceZip, setServiceZip] = useState('');
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>('idle');
   const [photoName, setPhotoName] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [bookingSubmitted, setBookingSubmitted] = useState(false);
+  const [submittedBookingId, setSubmittedBookingId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>({
+    customerName: '',
+    phone: '',
+    address: '',
+    pickupDate: '',
+    pickupWindow: '',
+  });
 
   const addToCart = (item: Item) => {
     setCart(prev => {
@@ -334,12 +378,72 @@ export default function App() {
 
   const openCheckout = () => {
     setBookingSubmitted(false);
+    setFormError('');
     setModalOpen(true);
   };
 
-  const handleCheckout = (e: FormEvent) => {
+  const updateCheckoutForm = (field: keyof CheckoutForm, value: string) => {
+    setCheckoutForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setFormError('');
+    if (file && file.size > maxBookingPhotoSize) {
+      setPhotoFile(null);
+      setPhotoName('');
+      event.target.value = '';
+      setFormError('Please choose a photo smaller than 4 MB.');
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoName(file?.name || '');
+  };
+
+  const handleCheckout = async (e: FormEvent) => {
     e.preventDefault();
-    setBookingSubmitted(true);
+    setFormError('');
+    setIsSubmitting(true);
+
+    try {
+      const photo = photoFile ? await fileToBookingPhoto(photoFile) : null;
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: checkoutForm.customerName,
+          phone: checkoutForm.phone,
+          address: checkoutForm.address,
+          zip: serviceZip,
+          pickupDate: checkoutForm.pickupDate,
+          pickupWindow: checkoutForm.pickupWindow,
+          items: cart,
+          addOns: [
+            ...(rush ? [{ id: 'rush', name: 'Same-Day Rush Pickup', price: rushFee }] : []),
+            ...(heavy ? [{ id: 'heavy', name: 'Heavy Lifting', price: heavyFee }] : []),
+          ],
+          subtotal,
+          total,
+          photo,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not save this booking.');
+      }
+
+      setSubmittedBookingId(result.bookingId || '');
+      setBookingSubmitted(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not save this booking.';
+      setFormError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -698,8 +802,13 @@ export default function App() {
                   <CheckCircle2 className="h-12 w-12 text-orange-500 mb-6" />
                   <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter text-white mb-4">Request Locked In</h2>
                   <p className="text-zinc-400 leading-relaxed">
-                    Your haul details are staged for the payment handoff. In a production build, this screen would create the booking record and send the customer to Stripe Checkout for ${total}.
+                    Your haul details were saved. We will review the request, confirm the pickup window, and follow up by text.
                   </p>
+                  {submittedBookingId ? (
+                    <p className="mt-4 border border-zinc-800 bg-black px-4 py-3 text-xs font-bold uppercase tracking-widest text-zinc-500">
+                      Booking ID: <span className="text-orange-500">{submittedBookingId}</span>
+                    </p>
+                  ) : null}
                   <button type="button" onClick={() => setModalOpen(false)} className="mt-8 bg-orange-500 hover:bg-orange-400 text-black font-black uppercase tracking-widest px-6 py-4">
                     Back to Booking
                   </button>
@@ -718,15 +827,36 @@ export default function App() {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Contact Name</label>
-                          <input required type="text" className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" placeholder="e.g. John Smith" />
+                          <input
+                            required
+                            type="text"
+                            value={checkoutForm.customerName}
+                            onChange={e => updateCheckoutForm('customerName', e.target.value)}
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                            placeholder="e.g. John Smith"
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Mobile Number (For Text Updates)</label>
-                          <input required type="tel" className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" placeholder="(214) 555-0123" />
+                          <input
+                            required
+                            type="tel"
+                            value={checkoutForm.phone}
+                            onChange={e => updateCheckoutForm('phone', e.target.value)}
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                            placeholder="(214) 555-0123"
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Pickup Address</label>
-                          <input required type="text" className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" placeholder="St. Address, City" />
+                          <input
+                            required
+                            type="text"
+                            value={checkoutForm.address}
+                            onChange={e => updateCheckoutForm('address', e.target.value)}
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                            placeholder="St. Address, City"
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">ZIP Code</label>
@@ -744,11 +874,23 @@ export default function App() {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Pickup Date</label>
-                          <input required min={today} type="date" className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [color-scheme:dark] outline-none" />
+                          <input
+                            required
+                            min={today}
+                            type="date"
+                            value={checkoutForm.pickupDate}
+                            onChange={e => updateCheckoutForm('pickupDate', e.target.value)}
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [color-scheme:dark] outline-none"
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">4-Hour Time Window</label>
-                          <select required className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none">
+                          <select
+                            required
+                            value={checkoutForm.pickupWindow}
+                            onChange={e => updateCheckoutForm('pickupWindow', e.target.value)}
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                          >
                             <option value="">Select Window</option>
                             <option value="8am-12pm">8:00 AM - 12:00 PM</option>
                             <option value="12pm-4pm">12:00 PM - 4:00 PM</option>
@@ -762,7 +904,7 @@ export default function App() {
                               type="file"
                               accept="image/*"
                               className="sr-only"
-                              onChange={e => setPhotoName(e.target.files?.[0]?.name || '')}
+                              onChange={handlePhotoChange}
                             />
                             <Truck className="mb-2 h-7 w-7 text-orange-500" />
                             <span className="text-xs font-bold text-zinc-300">{photoName || 'Upload curbside photo'}</span>
@@ -776,8 +918,14 @@ export default function App() {
                       </div>
                     </div>
 
-                    <button type="submit" className="w-full bg-orange-500 hover:bg-orange-400 text-black font-black uppercase tracking-widest text-xl sm:text-2xl px-6 py-6 flex items-center justify-center transition-all mt-6">
-                      {checkoutLabel} <span className="ml-2">${total}</span>
+                    {formError ? (
+                      <div className="border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+                        {formError}
+                      </div>
+                    ) : null}
+
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-orange-500 hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 text-black font-black uppercase tracking-widest text-xl sm:text-2xl px-6 py-6 flex items-center justify-center transition-all mt-6">
+                      {isSubmitting ? 'Saving Booking...' : checkoutLabel} <span className="ml-2">${total}</span>
                     </button>
                   </form>
                 </div>
