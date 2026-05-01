@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState, ChangeEvent, FormEvent } from 'react';
+import React, { useEffect, useId, useMemo, useState, ChangeEvent, FormEvent } from 'react';
 import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2, ShieldCheck } from 'lucide-react';
 
 const NinjaIcon = ({ className = "" }: { className?: string }) => (
@@ -60,6 +60,18 @@ type CheckoutForm = {
   pickupDate: string;
   pickupWindow: string;
 };
+
+type AvailabilityWindow = {
+  id: string;
+  label: string;
+  available: boolean;
+};
+
+const defaultPickupWindows: AvailabilityWindow[] = [
+  { id: '8am-12pm', label: '8:00 AM - 12:00 PM', available: true },
+  { id: '12pm-4pm', label: '12:00 PM - 4:00 PM', available: true },
+  { id: '4pm-8pm', label: '4:00 PM - 8:00 PM', available: true },
+];
 
 const QUICK_ITEMS: Item[] = [
   { id: 'couch', name: 'Standard Couch', price: 95, description: 'Sofa, loveseat, or sectional piece.', kind: 'couch' },
@@ -317,6 +329,9 @@ export default function App() {
   const [submittedBookingId, setSubmittedBookingId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [pickupWindows, setPickupWindows] = useState<AvailabilityWindow[]>(defaultPickupWindows);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
   const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>({
     customerName: '',
     phone: '',
@@ -376,6 +391,60 @@ export default function App() {
     ...(heavy ? [{ id: 'heavy', name: 'Heavy Lifting', amount: heavyFee }] : []),
   ], [cart, rush, heavy, rushFee, heavyFee]);
 
+  const selectedPickupWindow = pickupWindows.find(window => window.id === checkoutForm.pickupWindow);
+
+  useEffect(() => {
+    if (!checkoutForm.pickupDate) {
+      setPickupWindows(defaultPickupWindows);
+      setAvailabilityError('');
+      return;
+    }
+
+    let isActive = true;
+    setIsCheckingAvailability(true);
+    setAvailabilityError('');
+
+    fetch(`/api/availability?date=${encodeURIComponent(checkoutForm.pickupDate)}`)
+      .then(async response => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result.error || 'Could not check availability.');
+        }
+        return result;
+      })
+      .then(result => {
+        if (!isActive) {
+          return;
+        }
+
+        const windows = Array.isArray(result.windows) ? result.windows : defaultPickupWindows;
+        setPickupWindows(windows);
+
+        setCheckoutForm(prev => {
+          const selectedWindow = windows.find((window: AvailabilityWindow) => window.id === prev.pickupWindow);
+          return selectedWindow && !selectedWindow.available ? { ...prev, pickupWindow: '' } : prev;
+        });
+      })
+      .catch(error => {
+        if (!isActive) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : 'Could not check availability.';
+        setAvailabilityError(message);
+        setPickupWindows(defaultPickupWindows);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsCheckingAvailability(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [checkoutForm.pickupDate]);
+
   const openCheckout = () => {
     setBookingSubmitted(false);
     setFormError('');
@@ -406,6 +475,10 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
+      if (selectedPickupWindow && !selectedPickupWindow.available) {
+        throw new Error('That pickup window is no longer available. Please choose another window.');
+      }
+
       const photo = photoFile ? await fileToBookingPhoto(photoFile) : null;
       const response = await fetch('/api/bookings', {
         method: 'POST',
@@ -879,7 +952,7 @@ export default function App() {
                             min={today}
                             type="date"
                             value={checkoutForm.pickupDate}
-                            onChange={e => updateCheckoutForm('pickupDate', e.target.value)}
+                            onChange={e => setCheckoutForm(prev => ({ ...prev, pickupDate: e.target.value, pickupWindow: '' }))}
                             className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [color-scheme:dark] outline-none"
                           />
                         </div>
@@ -887,15 +960,31 @@ export default function App() {
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">4-Hour Time Window</label>
                           <select
                             required
+                            disabled={!checkoutForm.pickupDate || isCheckingAvailability}
                             value={checkoutForm.pickupWindow}
                             onChange={e => updateCheckoutForm('pickupWindow', e.target.value)}
-                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                            className="w-full bg-black border border-zinc-700 px-3 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 outline-none"
                           >
-                            <option value="">Select Window</option>
-                            <option value="8am-12pm">8:00 AM - 12:00 PM</option>
-                            <option value="12pm-4pm">12:00 PM - 4:00 PM</option>
-                            <option value="4pm-8pm">4:00 PM - 8:00 PM</option>
+                            <option value="">{isCheckingAvailability ? 'Checking availability...' : 'Select Window'}</option>
+                            {pickupWindows.map(window => (
+                              <option key={window.id} value={window.id} disabled={!window.available}>
+                                {window.label}{window.available ? '' : ' - Booked'}
+                              </option>
+                            ))}
                           </select>
+                          {checkoutForm.pickupDate ? (
+                            <div className="mt-2 space-y-1">
+                              {availabilityError ? (
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">
+                                  Availability check failed. Windows are shown as selectable.
+                                </p>
+                              ) : (
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                                  Booked windows are disabled automatically.
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Optional Junk Photo</label>

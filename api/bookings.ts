@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { google } from 'googleapis';
 import { Resend } from 'resend';
+import {
+  getCalendarClient,
+  getWindowDateTimes,
+  googleCalendarId,
+  googleCalendarTimeZone,
+  isGoogleCalendarConfigured,
+} from './_calendar';
 
 type BookingPhoto = {
   name: string;
@@ -39,10 +45,6 @@ const photoBucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || 'booking-photo
 const notificationTo = process.env.BOOKING_NOTIFICATION_EMAIL;
 const notificationFrom = process.env.BOOKING_NOTIFICATION_FROM || 'Junk Ninjas <onboarding@resend.dev>';
 const resendApiKey = process.env.RESEND_API_KEY;
-const googleCalendarId = process.env.GOOGLE_CALENDAR_ID;
-const googleServiceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const googlePrivateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-const googleCalendarTimeZone = process.env.GOOGLE_CALENDAR_TIME_ZONE || 'America/Chicago';
 
 const supabase = supabaseUrl && supabaseSecretKey
   ? createClient(supabaseUrl, supabaseSecretKey, {
@@ -172,33 +174,17 @@ const sendBookingNotification = async (
   return { sent: true };
 };
 
-const pickupWindowTimes: Record<string, { start: string; end: string }> = {
-  '8am-12pm': { start: '08:00:00', end: '12:00:00' },
-  '12pm-4pm': { start: '12:00:00', end: '16:00:00' },
-  '4pm-8pm': { start: '16:00:00', end: '20:00:00' },
-};
-
 const createCalendarEvent = async (
   bookingId: string,
   payload: BookingPayload,
   photoUrl: string | null,
 ): Promise<CalendarResult> => {
-  if (!googleCalendarId || !googleServiceAccountEmail || !googlePrivateKey) {
+  if (!googleCalendarId || !isGoogleCalendarConfigured()) {
     return { created: false, reason: 'Google Calendar is not configured.' };
   }
 
-  const windowTimes = pickupWindowTimes[payload.pickupWindow];
-  if (!windowTimes) {
-    return { created: false, reason: 'Unknown pickup window.' };
-  }
-
-  const auth = new google.auth.JWT({
-    email: googleServiceAccountEmail,
-    key: googlePrivateKey,
-    scopes: ['https://www.googleapis.com/auth/calendar.events'],
-  });
-
-  const calendar = google.calendar({ version: 'v3', auth });
+  const windowDateTimes = getWindowDateTimes(payload.pickupDate, payload.pickupWindow);
+  const calendar = getCalendarClient();
   const description = [
     `Booking ID: ${bookingId}`,
     `Customer: ${payload.customerName}`,
@@ -223,11 +209,11 @@ const createCalendarEvent = async (
       location: `${payload.address} ${payload.zip}`,
       description,
       start: {
-        dateTime: `${payload.pickupDate}T${windowTimes.start}`,
+        dateTime: windowDateTimes.start,
         timeZone: googleCalendarTimeZone,
       },
       end: {
-        dateTime: `${payload.pickupDate}T${windowTimes.end}`,
+        dateTime: windowDateTimes.end,
         timeZone: googleCalendarTimeZone,
       },
       extendedProperties: {
