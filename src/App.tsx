@@ -1106,7 +1106,7 @@ function BookingApp() {
       </header>
 
       <section className="border-b border-zinc-900 bg-black">
-        <div className="max-w-7xl mx-auto grid gap-px bg-zinc-900 sm:grid-cols-3">
+        <div className="mx-auto grid max-w-4xl gap-px bg-zinc-900 sm:grid-cols-2">
           {TRUST_ITEMS.map(({ title, body, Icon }) => (
             <div key={title} className="bg-black px-5 py-5 flex gap-4">
               <Icon className="h-6 w-6 shrink-0 text-orange-500" />
@@ -1227,7 +1227,7 @@ function BookingApp() {
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[360px_1fr]">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Local Junk Removal</p>
-            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Dallas & North DFW Service Areas</h2>
+            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Dallas Service Areas</h2>
             <p className="mt-4 text-sm leading-relaxed text-zinc-500">
               Junk Ninjas is built for fast curbside junk removal across Dallas and nearby DFW neighborhoods.
             </p>
