@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useState, ChangeEvent, FormEvent } from 'react';
-import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2 } from 'lucide-react';
+import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2, ShieldCheck } from 'lucide-react';
 
 const NinjaIcon = ({ className = "" }: { className?: string }) => (
   <svg
