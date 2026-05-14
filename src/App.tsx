@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useState, ChangeEvent, FormEvent } from 'react';
-import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2, ShieldCheck } from 'lucide-react';
+import { Truck, CheckCircle2, ChevronRight, X, Plus, Minus, Trash2 } from 'lucide-react';
 
 const NinjaIcon = ({ className = "" }: { className?: string }) => (
   <svg
@@ -89,7 +89,6 @@ const VOLUME_PILES: Item[] = [
 ];
 
 const TRUST_ITEMS = [
-  { title: 'Insured Crew', body: 'Uniformed pickup team with careful curb-to-truck handling.', Icon: ShieldCheck },
   { title: 'Text Updates', body: 'Arrival window and completion confirmation sent by phone.', Icon: CheckCircle2 },
   { title: 'Flat Pricing', body: 'Your selected haul price stays visible before checkout.', Icon: Truck },
 ];
