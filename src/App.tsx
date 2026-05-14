@@ -101,6 +101,78 @@ const HOW_IT_WORKS = [
   { title: 'We Clear It Out', body: 'You get text updates, a cleared curb, and a simple final confirmation.' },
 ];
 
+const BUSINESS_PHONE = '(972) 904-5132';
+const BUSINESS_PHONE_HREF = 'tel:+19729045132';
+
+const OFFER_STACK = [
+  'Flat-rate junk pickup',
+  '24-hour removal',
+  'No-contact curbside service',
+  'Text ETA',
+  'Photo confirmation',
+  'Dump fees included',
+  'Donation/recycling sorting when possible',
+  '4-hour window guarantee',
+];
+
+const RISK_REVERSALS = [
+  'No surprise estimate',
+  'Price shown before checkout',
+  'Photo review before we touch anything if the load looks mispriced',
+  'Late confirmed window = free haul',
+];
+
+const BONUSES = [
+  'Free photo review',
+  'Free driveway/curb sweep after pickup',
+  'Free donation/recycling sorting when available',
+  'Free text-before-arrival updates',
+];
+
+const COMPARISON_ITEMS = [
+  { title: 'Rent A Truck', body: 'You lift it, pay rental fees, buy gas, find the dump, and lose half a day.' },
+  { title: 'Call Around', body: 'You wait on estimates, repeat the same details, and still may not know the final price.' },
+  { title: 'Junk Ninjas', body: 'Pick the haul, see the price, reserve a window, and leave it curbside.' },
+];
+
+const SERVICE_AREAS = [
+  'Dallas',
+  'North Dallas',
+  'Addison',
+  'Carrollton',
+  'Plano',
+  'Richardson',
+  'Frisco',
+  'Lewisville',
+  'The Colony',
+  'Farmers Branch',
+  'Coppell',
+  'Flower Mound',
+];
+
+const POLICY_SECTIONS = [
+  {
+    title: 'Privacy Policy',
+    body: 'We collect booking details, contact information, pickup address, uploaded photos, and payment status only to schedule, price, confirm, and complete your junk removal request. We do not sell customer information.',
+  },
+  {
+    title: 'Terms Of Service',
+    body: 'Online pricing applies to the selected items, volume, access conditions, and service area shown at booking. If the actual load, access path, or item type is different, we confirm any price change before hauling.',
+  },
+  {
+    title: 'SMS Consent',
+    body: 'By booking, you agree that Junk Ninjas may call or text the number provided about your quote, pickup window, crew arrival, payment, and completion. Message and data rates may apply.',
+  },
+  {
+    title: 'Cancellation & Refunds',
+    body: 'Cancel or reschedule before your confirmed pickup window by calling or texting us. Refunds depend on payment status, route timing, and whether the crew has already been dispatched.',
+  },
+  {
+    title: 'Service Limitations',
+    body: 'We do not accept hazardous materials, chemicals, fuel, oil tanks, regulated waste, blocked access, unsafe lifting conditions, or items that require special disposal unless agreed in writing first.',
+  },
+];
+
 const FAQS = [
   {
     question: 'Do I need to be home for pickup?',
@@ -120,11 +192,15 @@ const FAQS = [
   },
   {
     question: 'How fast can you pick up?',
-    answer: 'Standard bookings are built around a 24-hour pickup window. Same-day rush pickup is available as an add-on when scheduling capacity allows.',
+    answer: 'Standard bookings are built around a 24-hour pickup window. Same-day rush pickup closes at 11 AM when route capacity is available.',
   },
   {
     question: 'How does payment work?',
-    answer: 'The site shows an estimated total before checkout. In a production setup, payment would be collected securely through checkout or confirmed after a custom quote.',
+    answer: 'You see the estimated total before checkout. Standard in-zone bookings can be paid through secure checkout when online payment is available; custom quote requests are confirmed by text before hauling starts.',
+  },
+  {
+    question: 'How does the 4-hour window guarantee work?',
+    answer: 'If we miss a confirmed 4-hour window, your haul is free. The guarantee applies to approved items with clear, safe access and excludes weather delays, blocked pickup areas, wrong addresses, hazardous items, or customer-requested changes.',
   },
 ];
 
@@ -927,9 +1003,11 @@ function BookingApp() {
             <NinjaIcon className="w-8 h-8 text-white -ml-1" />
             JUNK NINJAS
           </div>
-          <div className="hidden sm:flex items-center gap-4 text-[10px] font-bold text-white uppercase tracking-widest bg-black px-3 py-1">
-            Service Status: <span className="text-green-400">Online / 24h Active</span>
-          </div>
+          <a href={BUSINESS_PHONE_HREF} className="flex items-center gap-2 bg-black px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-white hover:text-orange-200 sm:text-[10px]">
+            <span className="hidden md:inline">Have a Question? Call/Text:</span>
+            <span className="md:hidden">Call/Text</span>
+            <span className="text-green-400">{BUSINESS_PHONE}</span>
+          </a>
         </div>
       </nav>
 
@@ -943,8 +1021,8 @@ function BookingApp() {
 
       <header className="relative pt-28 pb-16 lg:pt-36 lg:pb-20 border-b border-zinc-800 px-4 bg-zinc-900 overflow-hidden">
         <img
-          src="/assets/junk-ninjas-hero.png"
-          alt=""
+          src="/assets/junk-ninjas-hero.jpg"
+          alt="Junk Ninjas enclosed trailer ready for Dallas junk removal pickup"
           className="absolute inset-0 h-full w-full object-cover opacity-55"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-zinc-950/25" />
@@ -977,11 +1055,14 @@ function BookingApp() {
                 <p className="text-xs md:text-sm font-medium leading-relaxed text-zinc-300">
                   If we miss your <span className="text-white underline decoration-orange-500">4-hour pickup window</span>, your haul is <span className="text-orange-500 font-bold">100% FREE</span>. No questions asked.
                 </p>
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                  Applies to confirmed windows, approved items, and clear safe access.
+                </p>
               </div>
             </div>
 
             <button type="button" onClick={scrollToBooking} className="bg-orange-500 hover:bg-orange-400 focus:scale-95 transition-all text-black font-black uppercase tracking-widest text-lg md:text-xl px-10 py-5 flex items-center justify-center gap-3 mx-auto lg:mx-0 w-full sm:w-auto">
-              Select Your Junk Below <ChevronRight className="w-6 h-6" />
+              Get My Pickup Price <ChevronRight className="w-6 h-6" />
             </button>
           </div>
 
@@ -990,8 +1071,8 @@ function BookingApp() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="relative min-h-64 overflow-hidden border border-zinc-800 bg-zinc-950">
                   <img
-                    src="/assets/junk-before.png"
-                    alt="Curbside pile before pickup"
+                    src="/assets/junk-before.jpg"
+                    alt="Dallas curbside junk pile before Junk Ninjas pickup"
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
@@ -999,8 +1080,8 @@ function BookingApp() {
                 </div>
                 <div className="relative min-h-64 overflow-hidden border border-orange-500/50 bg-zinc-950">
                   <img
-                    src="/assets/junk-after.png"
-                    alt="Clean curb and driveway after pickup"
+                    src="/assets/junk-after.jpg"
+                    alt="Clean Dallas driveway after Junk Ninjas junk removal pickup"
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
@@ -1041,6 +1122,85 @@ function BookingApp() {
       </section>
 
       <section className="border-b border-zinc-900 bg-zinc-950 px-4 py-14 lg:py-20">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_420px]">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">The No-Brainer Haul</p>
+            <h2 className="mt-2 max-w-4xl text-3xl font-black uppercase italic tracking-tight text-white lg:text-5xl">
+              Book once. See the price. Put it curbside. Watch it disappear.
+            </h2>
+            <p className="mt-5 max-w-2xl text-sm leading-relaxed text-zinc-400">
+              Book online today and get flat-rate junk pickup, 24-hour removal, no-contact curbside service, text ETA, photo confirmation, dump fees included, donation/recycling sorting when possible, and a 4-hour window guarantee.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {OFFER_STACK.map(item => (
+                <div key={item} className="flex items-center gap-3 border border-zinc-800 bg-black px-4 py-3 text-sm font-bold text-zinc-300">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-orange-500" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <aside className="border border-orange-500/50 bg-black p-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Real Urgency</p>
+            <h3 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">Same-Day Routes Are Limited</h3>
+            <div className="mt-5 space-y-4 text-sm leading-relaxed text-zinc-400">
+              <p>Same-day pickup slots close at <span className="font-black text-white">11 AM</span> when route capacity is available.</p>
+              <p>Rush routes are limited by crew capacity, trailer space, and drive time. If the same-day route is full, the next 24-hour pickup window is the fastest clean option.</p>
+            </div>
+            <a href={BUSINESS_PHONE_HREF} className="mt-6 flex w-full items-center justify-center bg-orange-500 px-5 py-4 text-center text-sm font-black uppercase tracking-widest text-black hover:bg-orange-400">
+              Call/Text {BUSINESS_PHONE}
+            </a>
+          </aside>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-900 bg-black px-4 py-14 lg:py-20">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Risk Reversal</p>
+            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">No Estimate Games</h2>
+            <div className="mt-6 grid gap-3">
+              {RISK_REVERSALS.map(item => (
+                <div key={item} className="flex items-start gap-3 border border-zinc-800 bg-zinc-950 px-4 py-4 text-sm font-bold text-zinc-300">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Included Bonuses</p>
+            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Free Stuff That Saves The Hassle</h2>
+            <div className="mt-6 grid gap-3">
+              {BONUSES.map(item => (
+                <div key={item} className="flex items-start gap-3 border border-zinc-800 bg-zinc-950 px-4 py-4 text-sm font-bold text-zinc-300">
+                  <Plus className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-900 bg-zinc-950 px-4 py-14 lg:py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 border-b border-zinc-800 pb-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">The Alternative Costs More Than You Think</p>
+            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Why Make Junk Removal A Project?</h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {COMPARISON_ITEMS.map(item => (
+              <div key={item.title} className={`border p-6 ${item.title === 'Junk Ninjas' ? 'border-orange-500 bg-orange-500/10' : 'border-zinc-800 bg-black'}`}>
+                <h3 className="text-xl font-black uppercase tracking-tight text-white">{item.title}</h3>
+                <p className="mt-4 text-sm leading-relaxed text-zinc-400">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-900 bg-zinc-950 px-4 py-14 lg:py-20">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8 flex flex-col gap-3 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1059,6 +1219,25 @@ function BookingApp() {
                 </div>
                 <h3 className="text-base font-black uppercase tracking-tight text-white">{step.title}</h3>
                 <p className="mt-3 text-sm leading-relaxed text-zinc-500">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-900 bg-black px-4 py-14 lg:py-20">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[360px_1fr]">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Local Junk Removal</p>
+            <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Dallas & North DFW Service Areas</h2>
+            <p className="mt-4 text-sm leading-relaxed text-zinc-500">
+              Junk Ninjas is built for fast curbside junk removal across Dallas, North Dallas, and nearby DFW neighborhoods.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SERVICE_AREAS.map(area => (
+              <div key={area} className="border border-zinc-800 bg-zinc-950 px-4 py-4 text-sm font-black uppercase tracking-widest text-zinc-300">
+                {area}
               </div>
             ))}
           </div>
@@ -1298,7 +1477,7 @@ function BookingApp() {
               <div className="grid lg:grid-cols-[1fr_360px]">
                 <div className="p-8 sm:p-10 space-y-8 flex-1">
                   <div>
-                    <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter text-white mb-2">Final Step: Logistics</h2>
+                    <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter text-white mb-2">Reserve Your Pickup</h2>
                     <p className="text-zinc-400 text-sm font-medium">Lock in your 24-hour disappearance window.</p>
                   </div>
 
@@ -1408,6 +1587,13 @@ function BookingApp() {
                       </div>
                     </div>
 
+                    <label className="flex items-start gap-3 border border-zinc-800 bg-black px-4 py-4 text-left">
+                      <input required type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-orange-500" />
+                      <span className="text-xs leading-relaxed text-zinc-400">
+                        I agree that Junk Ninjas may call or text me at the number provided about this quote, pickup window, crew arrival, payment, and completion. Message and data rates may apply.
+                      </span>
+                    </label>
+
                     {formError ? (
                       <div className="border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
                         {formError}
@@ -1448,8 +1634,31 @@ function BookingApp() {
         </div>
       )}
 
-      <footer className="border-t border-zinc-900 py-12 text-center text-zinc-600 font-medium">
-        <p>&copy; {new Date().getFullYear()} Junk Ninjas Junk Removal Dallas. All rights reserved.</p>
+      <footer className="border-t border-zinc-900 bg-black px-4 py-12 text-zinc-600">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col gap-4 border-b border-zinc-900 pb-8 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <div>
+              <p className="text-lg font-black uppercase tracking-tight text-white">Junk Ninjas Junk Removal Dallas</p>
+              <p className="mt-1 text-sm font-medium">Flat-rate curbside junk pickup across Dallas and North DFW.</p>
+            </div>
+            <a href={BUSINESS_PHONE_HREF} className="font-black uppercase tracking-widest text-orange-500 hover:text-orange-400">
+              Call/Text {BUSINESS_PHONE}
+            </a>
+          </div>
+
+          <div className="mt-8 grid gap-4 lg:grid-cols-5">
+            {POLICY_SECTIONS.map(section => (
+              <details key={section.title} className="border border-zinc-900 bg-zinc-950 p-4">
+                <summary className="cursor-pointer list-none text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                  {section.title}
+                </summary>
+                <p className="mt-3 text-xs leading-relaxed text-zinc-500">{section.body}</p>
+              </details>
+            ))}
+          </div>
+
+          <p className="mt-8 text-center text-sm font-medium">&copy; {new Date().getFullYear()} Junk Ninjas Junk Removal Dallas. All rights reserved.</p>
+        </div>
       </footer>
     </div>
   );

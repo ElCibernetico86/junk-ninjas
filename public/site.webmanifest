@@ -1,0 +1,17 @@
+{
+  "name": "Junk Ninjas",
+  "short_name": "Junk Ninjas",
+  "description": "Flat-rate junk removal in Dallas with no-contact curbside pickup.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

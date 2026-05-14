@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://junkninjas.com/sitemap.xml
