@@ -136,7 +136,6 @@ const COMPARISON_ITEMS = [
 
 const SERVICE_AREAS = [
   'Dallas',
-  'North Dallas',
   'Addison',
   'Carrollton',
   'Plano',
@@ -1038,7 +1037,7 @@ function BookingApp() {
                 <span className="animate-ping absolute inline-flex h-full w-full bg-orange-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 bg-orange-500"></span>
               </span>
-              Servicing North Dallas & DFW
+              Servicing Dallas & DFW
             </div>
 
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-black uppercase tracking-tighter leading-none mb-8 text-white">
@@ -1230,7 +1229,7 @@ function BookingApp() {
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Local Junk Removal</p>
             <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Dallas & North DFW Service Areas</h2>
             <p className="mt-4 text-sm leading-relaxed text-zinc-500">
-              Junk Ninjas is built for fast curbside junk removal across Dallas, North Dallas, and nearby DFW neighborhoods.
+              Junk Ninjas is built for fast curbside junk removal across Dallas and nearby DFW neighborhoods.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1251,7 +1250,7 @@ function BookingApp() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Service Area Check</p>
                 <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">Confirm Your ZIP</h2>
-                <p className="mt-1 text-sm text-zinc-500">North Dallas and nearby DFW neighborhoods are live for online booking.</p>
+                <p className="mt-1 text-sm text-zinc-500">Dallas and nearby DFW neighborhoods are live for online booking.</p>
               </div>
               <div className="sm:w-64">
                 <label className="sr-only" htmlFor="service-zip">ZIP code</label>
